@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "516333690098",
+    "project_id": "arklite-dev",
+    "storage_bucket": "arklite-dev.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:516333690098:android:6c1fa576a1fe78992a846b",
+        "android_client_info": {
+          "package_name": "com.example.arklite"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyA-RYxi-tEm0t8oskKcbz04CTo4qmcYkrQ"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
