@@ -13,7 +13,14 @@ class HomeScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: Text('IAQ Monitoring'),
+        actions: [
+          Image.asset('assets/images/logo.png', height: 40.h),
+        ],
+        title: Row(
+          children: [
+            Text('IAQ Monitoring'),
+          ],
+        ),
       ),
       drawer: AppDrawer(),
       body: RefreshIndicator(

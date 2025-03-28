@@ -69,11 +69,12 @@ class SensorController extends GetxController {
       final String apiKey = 'ZD6SM8ES78R0RG2W';
 
       final response = await http.get(
-        Uri.parse('https://api.thingspeak.com/channels/$channelId/feeds.json?api_key=$apiKey&results=1'),
+        Uri.parse('https://api.thingspeak.com/channels/$channelId/feeds.json?api_key=$apiKey&results=10'),
       );
 
       if (response.statusCode == 200) {
         final data = json.decode(response.body);
+        print(data);
         final feeds = data['feeds'] as List;
 
         if (feeds.isNotEmpty) {
