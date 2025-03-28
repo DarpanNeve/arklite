@@ -11,7 +11,9 @@ class SensorController extends GetxController {
   final AuthController _authController = Get.find<AuthController>();
 
   RxList<SensorModel> sensors = <SensorModel>[].obs;
+  RxList<Map<String, dynamic>> thingSpeakHistory = <Map<String, dynamic>>[].obs;
   RxBool isLoading = false.obs;
+  RxBool isLoadingHistory = false.obs;
 
   // Current sensor readings
   RxDouble temperature = 0.0.obs;
@@ -65,16 +67,15 @@ class SensorController extends GetxController {
       isLoading.value = true;
 
       // Replace with your ThingSpeak channel and API key
-      final String channelId = '2885210';
-      final String apiKey = 'ZD6SM8ES78R0RG2W';
+      final String channelId = 'YOUR_CHANNEL_ID';
+      final String apiKey = 'YOUR_API_KEY';
 
       final response = await http.get(
-        Uri.parse('https://api.thingspeak.com/channels/$channelId/feeds.json?api_key=$apiKey&results=10'),
+        Uri.parse('https://api.thingspeak.com/channels/$channelId/feeds.json?api_key=$apiKey&results=1'),
       );
 
       if (response.statusCode == 200) {
         final data = json.decode(response.body);
-        print(data);
         final feeds = data['feeds'] as List;
 
         if (feeds.isNotEmpty) {
@@ -97,6 +98,76 @@ class SensorController extends GetxController {
       print('Error fetching sensor data: $e');
     } finally {
       isLoading.value = false;
+    }
+  }
+
+  Future<void> fetchThingSpeakHistory(String sensorId) async {
+    try {
+      isLoadingHistory.value = true;
+      thingSpeakHistory.clear();
+
+      // Replace with your ThingSpeak channel and API key
+      final String channelId = '2885210';
+      final String apiKey = 'ZD6SM8ES78R0RG2W';
+
+      // Get the field number based on sensorId
+      int fieldNumber = _getFieldNumber(sensorId);
+
+      final response = await http.get(
+        Uri.parse('https://api.thingspeak.com/channels/$channelId/feeds.json?api_key=$apiKey&results=20'),
+      );
+
+      if (response.statusCode == 200) {
+        final data = json.decode(response.body);
+        final feeds = data['feeds'] as List;
+
+        List<Map<String, dynamic>> history = [];
+
+        for (var feed in feeds.reversed) {
+          // Skip entries with null or empty values
+          if (feed['field$fieldNumber'] == null || feed['field$fieldNumber'] == '') {
+            continue;
+          }
+
+          try {
+            double value = double.parse(feed['field$fieldNumber']);
+            DateTime timestamp = DateTime.parse(feed['created_at']);
+
+            history.add({
+              'value': value,
+              'timestamp': timestamp,
+            });
+          } catch (e) {
+            print('Error parsing feed data: $e');
+          }
+        }
+
+        thingSpeakHistory.value = history;
+      }
+    } catch (e) {
+      print('Error fetching ThingSpeak history: $e');
+      Get.snackbar(
+        'Error',
+        'Failed to load sensor history: $e',
+        snackPosition: SnackPosition.BOTTOM,
+      );
+    } finally {
+      isLoadingHistory.value = false;
+    }
+  }
+
+  int _getFieldNumber(String sensorId) {
+    switch (sensorId) {
+      case 'temperature':
+        return 1;
+      case 'humidity':
+        return 2;
+      case 'voc':
+        return 3;
+      case 'pm':
+        return 4;
+      default:
+        return 1;
     }
   }
 
@@ -204,6 +275,26 @@ class SensorController extends GetxController {
     } catch (e) {
       print('Error saving IAQ record: $e');
     }
+  }
+
+  double getSensorValue(String sensorId) {
+    switch (sensorId) {
+      case 'temperature':
+        return temperature.value;
+      case 'humidity':
+        return humidity.value;
+      case 'voc':
+        return voc.value;
+      case 'pm':
+        return pm.value;
+      default:
+        return 0.0;
+    }
+  }
+
+  String getSensorUnit(String sensorId) {
+    SensorModel sensor = sensors.firstWhere((s) => s.id == sensorId);
+    return sensor.unit;
   }
 }
 

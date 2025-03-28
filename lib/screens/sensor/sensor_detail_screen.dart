@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
-import 'package:fl_chart/fl_chart.dart';
+import 'package:intl/intl.dart';
 
 import '../../controllers/sensor_controller.dart';
 import '../../models/sensor_model.dart';
@@ -15,10 +15,6 @@ class _SensorDetailScreenState extends State<SensorDetailScreen> {
   final SensorController _sensorController = Get.find<SensorController>();
   late String sensorId;
   late SensorModel sensor;
-  final List<Color> gradientColors = [
-    const Color(0xFF1976D2),
-    const Color(0xFF64B5F6),
-  ];
 
   @override
   void initState() {
@@ -26,7 +22,10 @@ class _SensorDetailScreenState extends State<SensorDetailScreen> {
     sensorId = Get.arguments['sensorId'];
     sensor = _sensorController.sensors.firstWhere((s) => s.id == sensorId);
 
-    // Start periodic updates
+    // Fetch ThingSpeak history data
+    _sensorController.fetchThingSpeakHistory(sensorId);
+
+    // Start periodic updates for current value
     _startPeriodicUpdates();
   }
 
@@ -46,22 +45,28 @@ class _SensorDetailScreenState extends State<SensorDetailScreen> {
       appBar: AppBar(
         title: Text('${sensor.name} Sensor'),
       ),
-      body: Padding(
-        padding: EdgeInsets.all(16.w),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            _buildCurrentValueCard(),
-            SizedBox(height: 24.h),
-            Text(
-              'Real-time Data',
-              style: Theme.of(context).textTheme.displaySmall,
-            ),
-            SizedBox(height: 16.h),
-            Expanded(
-              child: _buildChart(),
-            ),
-          ],
+      body: RefreshIndicator(
+        onRefresh: () async {
+          await _sensorController.fetchSensorData();
+          await _sensorController.fetchThingSpeakHistory(sensorId);
+        },
+        child: Padding(
+          padding: EdgeInsets.all(16.w),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              _buildCurrentValueCard(),
+              SizedBox(height: 24.h),
+              Text(
+                'Historical Data',
+                style: Theme.of(context).textTheme.displaySmall,
+              ),
+              SizedBox(height: 16.h),
+              Expanded(
+                child: _buildThingSpeakHistoryList(),
+              ),
+            ],
+          ),
         ),
       ),
     );
@@ -99,7 +104,7 @@ class _SensorDetailScreenState extends State<SensorDetailScreen> {
             ),
             SizedBox(height: 24.h),
             Obx(() {
-              double value = _getCurrentValue();
+              double value = _sensorController.getSensorValue(sensorId);
               return Text(
                 '${value.toStringAsFixed(1)} ${sensor.unit}',
                 style: Theme.of(context).textTheme.displayLarge!.copyWith(
@@ -113,110 +118,64 @@ class _SensorDetailScreenState extends State<SensorDetailScreen> {
     );
   }
 
-  Widget _buildChart() {
-    return Container(
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(12.r),
-        color: Colors.white,
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.05),
-            blurRadius: 10,
-            offset: Offset(0, 4),
+  Widget _buildThingSpeakHistoryList() {
+    return Obx(() {
+      if (_sensorController.isLoadingHistory.value) {
+        return Center(child: CircularProgressIndicator());
+      }
+
+      if (_sensorController.thingSpeakHistory.isEmpty) {
+        return Center(
+          child: Text(
+            'No historical data available',
+            style: Theme.of(context).textTheme.bodyLarge,
           ),
-        ],
-      ),
-      padding: EdgeInsets.all(16.w),
-      child: LineChart(
-        LineChartData(
-          gridData: FlGridData(
-            show: true,
-            drawVerticalLine: true,
-            horizontalInterval: _getChartInterval(),
-            verticalInterval: 1,
-          ),
-          titlesData: FlTitlesData(
-            show: true,
-            rightTitles: AxisTitles(
-              sideTitles: SideTitles(showTitles: false),
-            ),
-            topTitles: AxisTitles(
-              sideTitles: SideTitles(showTitles: false),
-            ),
-            bottomTitles: AxisTitles(
-              sideTitles: SideTitles(
-                showTitles: true,
-                reservedSize: 30,
-                interval: 1,
-                getTitlesWidget: (value, meta) {
-                  return SideTitleWidget(
-                   meta: meta,
-                    space: 8,
-                    child: Text(
-                      '${value.toInt()}m',
-                      style: TextStyle(
-                        color: Colors.grey,
-                        fontSize: 12.sp,
-                      ),
-                    ),
-                  );
-                },
-              ),
-            ),
-            leftTitles: AxisTitles(
-              sideTitles: SideTitles(
-                showTitles: true,
-                interval: _getChartInterval(),
-                getTitlesWidget: (value, meta) {
-                  return SideTitleWidget(
-                    meta: meta,
-                    space: 8,
-                    child: Text(
-                      value.toInt().toString(),
-                      style: TextStyle(
-                        color: Colors.grey,
-                        fontSize: 12.sp,
-                      ),
-                    ),
-                  );
-                },
-                reservedSize: 40,
-              ),
-            ),
-          ),
-          borderData: FlBorderData(
-            show: true,
-            border: Border.all(color: const Color(0xFFEEEEEE)),
-          ),
-          minX: 0,
-          maxX: 10,
-          minY: _getMinY(),
-          maxY: _getMaxY(),
-          lineBarsData: [
-            LineChartBarData(
-              spots: _generateRandomSpots(),
-              isCurved: true,
-              gradient: LinearGradient(
-                colors: gradientColors,
-              ),
-              barWidth: 3,
-              isStrokeCapRound: true,
-              dotData: FlDotData(
-                show: false,
-              ),
-              belowBarData: BarAreaData(
-                show: true,
-                gradient: LinearGradient(
-                  colors: gradientColors
-                      .map((color) => color.withOpacity(0.3))
-                      .toList(),
+        );
+      }
+
+      return ListView.builder(
+        itemCount: _sensorController.thingSpeakHistory.length,
+        itemBuilder: (context, index) {
+          final historyItem = _sensorController.thingSpeakHistory[index];
+          final double value = historyItem['value'];
+          final DateTime timestamp = historyItem['timestamp'];
+
+          return Card(
+            margin: EdgeInsets.only(bottom: 12.h),
+            child: ListTile(
+              title: Text(
+                '${value.toStringAsFixed(1)} ${sensor.unit}',
+                style: TextStyle(
+                  fontWeight: FontWeight.bold,
+                  fontSize: 16.sp,
+                  color: Theme.of(context).primaryColor,
                 ),
               ),
+              subtitle: Text(
+                'ThingSpeak Data',
+                style: TextStyle(fontSize: 12.sp),
+              ),
+              trailing: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                crossAxisAlignment: CrossAxisAlignment.end,
+                children: [
+                  Text(
+                    DateFormat('MM/dd/yyyy').format(timestamp),
+                    style: TextStyle(fontSize: 12.sp),
+                  ),
+                  SizedBox(height: 4.h),
+                  Text(
+                    DateFormat('HH:mm:ss').format(timestamp),
+                    style: TextStyle(fontSize: 12.sp),
+                  ),
+                ],
+              ),
+              contentPadding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 8.h),
             ),
-          ],
-        ),
-      ),
-    );
+          );
+        },
+      );
+    });
   }
 
   IconData _getSensorIcon() {
@@ -232,79 +191,6 @@ class _SensorDetailScreenState extends State<SensorDetailScreen> {
       default:
         return Icons.sensors;
     }
-  }
-
-  double _getCurrentValue() {
-    switch (sensor.id) {
-      case 'temperature':
-        return _sensorController.temperature.value;
-      case 'humidity':
-        return _sensorController.humidity.value;
-      case 'voc':
-        return _sensorController.voc.value;
-      case 'pm':
-        return _sensorController.pm.value;
-      default:
-        return 0.0;
-    }
-  }
-
-  double _getMinY() {
-    switch (sensor.id) {
-      case 'temperature':
-        return 15.0;
-      case 'humidity':
-        return 0.0;
-      case 'voc':
-        return 0.0;
-      case 'pm':
-        return 0.0;
-      default:
-        return 0.0;
-    }
-  }
-
-  double _getMaxY() {
-    switch (sensor.id) {
-      case 'temperature':
-        return 35.0;
-      case 'humidity':
-        return 100.0;
-      case 'voc':
-        return 1000.0;
-      case 'pm':
-        return 300.0;
-      default:
-        return 100.0;
-    }
-  }
-
-  double _getChartInterval() {
-    switch (sensor.id) {
-      case 'temperature':
-        return 5.0;
-      case 'humidity':
-        return 20.0;
-      case 'voc':
-        return 200.0;
-      case 'pm':
-        return 50.0;
-      default:
-        return 20.0;
-    }
-  }
-
-  List<FlSpot> _generateRandomSpots() {
-    final currentValue = _getCurrentValue();
-    final spots = <FlSpot>[];
-
-    for (int i = 0; i <= 10; i++) {
-      // Generate random variations around the current value
-      final random = (i % 2 == 0 ? 1 : -1) * (0.05 * currentValue * i / 10);
-      spots.add(FlSpot(i.toDouble(), currentValue + random));
-    }
-
-    return spots;
   }
 }
 

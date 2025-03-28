@@ -5,10 +5,12 @@ import 'package:fl_chart/fl_chart.dart';
 import 'package:intl/intl.dart';
 
 import '../../controllers/history_controller.dart';
+import '../../models/sensor_model.dart';
 import '../../widgets/app_drawer.dart';
 
 class HistoryScreen extends StatelessWidget {
   final HistoryController _historyController = Get.find<HistoryController>();
+  final TextEditingController _locationController = TextEditingController();
 
   @override
   Widget build(BuildContext context) {
@@ -42,7 +44,7 @@ class HistoryScreen extends StatelessWidget {
               ),
               SizedBox(height: 16.h),
               Expanded(
-                child: _buildRecordsList(),
+                child: _buildRecordsList(context),
               ),
             ],
           ),
@@ -118,7 +120,7 @@ class HistoryScreen extends StatelessWidget {
 
                     final date = chartData[value.toInt()]['timestamp'] as DateTime;
                     return SideTitleWidget(
-                     meta: meta,
+                      meta: meta,
                       space: 8,
                       child: Text(
                         DateFormat('MM/dd').format(date),
@@ -137,7 +139,7 @@ class HistoryScreen extends StatelessWidget {
                   interval: 50,
                   getTitlesWidget: (value, meta) {
                     return SideTitleWidget(
-                      meta: meta,
+               meta: meta,
                       space: 8,
                       child: Text(
                         value.toInt().toString(),
@@ -205,7 +207,7 @@ class HistoryScreen extends StatelessWidget {
     );
   }
 
-  Widget _buildRecordsList() {
+  Widget _buildRecordsList(BuildContext context) {
     return Obx(() {
       if (_historyController.isLoading.value && _historyController.iaqRecords.isEmpty) {
         return Center(child: CircularProgressIndicator());
@@ -247,6 +249,26 @@ class HistoryScreen extends StatelessWidget {
                   Text(
                     'VOC: ${record.voc.toStringAsFixed(1)} ppb | PM: ${record.pm.toStringAsFixed(1)} μg/m³',
                   ),
+                  SizedBox(height: 4.h),
+                  Row(
+                    children: [
+                      Text(
+                        'Location: ${record.location ?? "Not specified"}',
+                        style: TextStyle(
+                          fontStyle: record.location != null ? FontStyle.normal : FontStyle.italic,
+                        ),
+                      ),
+                      SizedBox(width: 8.w),
+                      InkWell(
+                        onTap: () => _showLocationDialog(context, record),
+                        child: Icon(
+                          Icons.edit,
+                          size: 16.sp,
+                          color: Theme.of(context).primaryColor,
+                        ),
+                      ),
+                    ],
+                  ),
                 ],
               ),
               trailing: Column(
@@ -270,6 +292,50 @@ class HistoryScreen extends StatelessWidget {
         },
       );
     });
+  }
+
+  void _showLocationDialog(BuildContext context, IAQRecord record) {
+    _locationController.text = record.location ?? '';
+
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text('Update Location'),
+        content: TextField(
+          controller: _locationController,
+          decoration: InputDecoration(
+            labelText: 'Location',
+            hintText: 'Enter location (e.g., Living Room)',
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(),
+            child: Text('Cancel'),
+          ),
+          Obx(() => TextButton(
+            onPressed: _historyController.isUpdatingLocation.value
+                ? null
+                : () {
+              _historyController.updateLocation(
+                record.id!,
+                _locationController.text.trim(),
+              );
+              Navigator.of(context).pop();
+            },
+            child: _historyController.isUpdatingLocation.value
+                ? SizedBox(
+              height: 16.h,
+              width: 16.w,
+              child: CircularProgressIndicator(
+                strokeWidth: 2,
+              ),
+            )
+                : Text('Save'),
+          )),
+        ],
+      ),
+    );
   }
 }
 
