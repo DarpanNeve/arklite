@@ -6,12 +6,12 @@ import '../models/sensor_model.dart';
 class SensorCard extends StatelessWidget {
   final SensorModel sensor;
   final VoidCallback onTap;
-  
+
   const SensorCard({
     required this.sensor,
     required this.onTap,
   });
-  
+
   @override
   Widget build(BuildContext context) {
     return Card(
@@ -64,17 +64,17 @@ class SensorCard extends StatelessWidget {
       ),
     );
   }
-  
+
   IconData _getSensorIcon() {
     switch (sensor.id) {
       case 'temperature':
         return Icons.thermostat;
       case 'humidity':
         return Icons.water_drop;
-      case 'co2':
-        return Icons.cloud;
       case 'voc':
         return Icons.air;
+      case 'pm':
+        return Icons.blur_on;
       default:
         return Icons.sensors;
     }

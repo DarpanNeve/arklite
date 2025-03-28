@@ -19,17 +19,17 @@ class _SensorDetailScreenState extends State<SensorDetailScreen> {
     const Color(0xFF1976D2),
     const Color(0xFF64B5F6),
   ];
-  
+
   @override
   void initState() {
     super.initState();
     sensorId = Get.arguments['sensorId'];
     sensor = _sensorController.sensors.firstWhere((s) => s.id == sensorId);
-    
+
     // Start periodic updates
     _startPeriodicUpdates();
   }
-  
+
   void _startPeriodicUpdates() {
     // Update sensor data every 10 seconds
     Future.delayed(Duration(seconds: 10), () {
@@ -39,7 +39,7 @@ class _SensorDetailScreenState extends State<SensorDetailScreen> {
       }
     });
   }
-  
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -66,7 +66,7 @@ class _SensorDetailScreenState extends State<SensorDetailScreen> {
       ),
     );
   }
-  
+
   Widget _buildCurrentValueCard() {
     return Card(
       child: Padding(
@@ -112,7 +112,7 @@ class _SensorDetailScreenState extends State<SensorDetailScreen> {
       ),
     );
   }
-  
+
   Widget _buildChart() {
     return Container(
       decoration: BoxDecoration(
@@ -150,7 +150,7 @@ class _SensorDetailScreenState extends State<SensorDetailScreen> {
                 interval: 1,
                 getTitlesWidget: (value, meta) {
                   return SideTitleWidget(
-                    meta: meta,
+                   meta: meta,
                     space: 8,
                     child: Text(
                       '${value.toInt()}m',
@@ -169,8 +169,8 @@ class _SensorDetailScreenState extends State<SensorDetailScreen> {
                 interval: _getChartInterval(),
                 getTitlesWidget: (value, meta) {
                   return SideTitleWidget(
-                    space: 8,
                     meta: meta,
+                    space: 8,
                     child: Text(
                       value.toInt().toString(),
                       style: TextStyle(
@@ -218,92 +218,92 @@ class _SensorDetailScreenState extends State<SensorDetailScreen> {
       ),
     );
   }
-  
+
   IconData _getSensorIcon() {
     switch (sensor.id) {
       case 'temperature':
         return Icons.thermostat;
       case 'humidity':
         return Icons.water_drop;
-      case 'co2':
-        return Icons.cloud;
       case 'voc':
         return Icons.air;
+      case 'pm':
+        return Icons.blur_on;
       default:
         return Icons.sensors;
     }
   }
-  
+
   double _getCurrentValue() {
     switch (sensor.id) {
       case 'temperature':
         return _sensorController.temperature.value;
       case 'humidity':
         return _sensorController.humidity.value;
-      case 'co2':
-        return _sensorController.co2.value;
       case 'voc':
         return _sensorController.voc.value;
+      case 'pm':
+        return _sensorController.pm.value;
       default:
         return 0.0;
     }
   }
-  
+
   double _getMinY() {
     switch (sensor.id) {
       case 'temperature':
         return 15.0;
       case 'humidity':
         return 0.0;
-      case 'co2':
-        return 300.0;
       case 'voc':
+        return 0.0;
+      case 'pm':
         return 0.0;
       default:
         return 0.0;
     }
   }
-  
+
   double _getMaxY() {
     switch (sensor.id) {
       case 'temperature':
         return 35.0;
       case 'humidity':
         return 100.0;
-      case 'co2':
-        return 2000.0;
       case 'voc':
         return 1000.0;
+      case 'pm':
+        return 300.0;
       default:
         return 100.0;
     }
   }
-  
+
   double _getChartInterval() {
     switch (sensor.id) {
       case 'temperature':
         return 5.0;
       case 'humidity':
         return 20.0;
-      case 'co2':
-        return 500.0;
       case 'voc':
         return 200.0;
+      case 'pm':
+        return 50.0;
       default:
         return 20.0;
     }
   }
-  
+
   List<FlSpot> _generateRandomSpots() {
     final currentValue = _getCurrentValue();
     final spots = <FlSpot>[];
-    
+
     for (int i = 0; i <= 10; i++) {
       // Generate random variations around the current value
       final random = (i % 2 == 0 ? 1 : -1) * (0.05 * currentValue * i / 10);
       spots.add(FlSpot(i.toDouble(), currentValue + random));
     }
-    
+
     return spots;
   }
 }

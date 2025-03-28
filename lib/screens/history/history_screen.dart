@@ -9,7 +9,7 @@ import '../../widgets/app_drawer.dart';
 
 class HistoryScreen extends StatelessWidget {
   final HistoryController _historyController = Get.find<HistoryController>();
-  
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -50,7 +50,7 @@ class HistoryScreen extends StatelessWidget {
       ),
     );
   }
-  
+
   Widget _buildIAQChart(BuildContext context) {
     return Container(
       height: 240.h,
@@ -70,7 +70,7 @@ class HistoryScreen extends StatelessWidget {
         if (_historyController.isLoading.value) {
           return Center(child: CircularProgressIndicator());
         }
-        
+
         if (_historyController.iaqRecords.isEmpty) {
           return Center(
             child: Text(
@@ -79,7 +79,7 @@ class HistoryScreen extends StatelessWidget {
             ),
           );
         }
-        
+
         final chartData = _historyController.getChartData();
         if (chartData.length < 2) {
           return Center(
@@ -89,7 +89,7 @@ class HistoryScreen extends StatelessWidget {
             ),
           );
         }
-        
+
         return LineChart(
           LineChartData(
             gridData: FlGridData(
@@ -115,10 +115,10 @@ class HistoryScreen extends StatelessWidget {
                     if (value.toInt() >= chartData.length || value.toInt() < 0) {
                       return const SizedBox.shrink();
                     }
-                    
+
                     final date = chartData[value.toInt()]['timestamp'] as DateTime;
                     return SideTitleWidget(
-                      meta: meta,
+                     meta: meta,
                       space: 8,
                       child: Text(
                         DateFormat('MM/dd').format(date),
@@ -204,13 +204,13 @@ class HistoryScreen extends StatelessWidget {
       }),
     );
   }
-  
+
   Widget _buildRecordsList() {
     return Obx(() {
       if (_historyController.isLoading.value && _historyController.iaqRecords.isEmpty) {
         return Center(child: CircularProgressIndicator());
       }
-      
+
       if (_historyController.iaqRecords.isEmpty) {
         return Center(
           child: Text(
@@ -219,7 +219,7 @@ class HistoryScreen extends StatelessWidget {
           ),
         );
       }
-      
+
       return ListView.builder(
         itemCount: _historyController.iaqRecords.length,
         itemBuilder: (context, index) {
@@ -245,7 +245,7 @@ class HistoryScreen extends StatelessWidget {
                   ),
                   SizedBox(height: 4.h),
                   Text(
-                    'CO2: ${record.co2.toStringAsFixed(1)} ppm | VOC: ${record.voc.toStringAsFixed(1)} ppb',
+                    'VOC: ${record.voc.toStringAsFixed(1)} ppb | PM: ${record.pm.toStringAsFixed(1)} μg/m³',
                   ),
                 ],
               ),
