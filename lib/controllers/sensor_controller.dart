@@ -32,6 +32,7 @@ class SensorController extends GetxController {
   }
 
   void loadSensors() {
+    print("load sensor called");
     sensors.value = [
       SensorModel(
         id: 'temperature',
@@ -67,27 +68,29 @@ class SensorController extends GetxController {
       isLoading.value = true;
 
       // Replace with your ThingSpeak channel and API key
-      final String channelId = 'YOUR_CHANNEL_ID';
-      final String apiKey = 'YOUR_API_KEY';
+      final String channelId = '2885210';
+      final String apiKey = 'ZD6SM8ES78R0RG2W';
 
       final response = await http.get(
         Uri.parse('https://api.thingspeak.com/channels/$channelId/feeds.json?api_key=$apiKey&results=1'),
       );
 
       if (response.statusCode == 200) {
+
         final data = json.decode(response.body);
+        print("response body is $data");
         final feeds = data['feeds'] as List;
 
         if (feeds.isNotEmpty) {
           final latestFeed = feeds[0];
 
-          // Update sensor values (field1, field2, etc. depend on your ThingSpeak channel setup)
+          // Update sensor values based on your ThingSpeak field configuration.
           temperature.value = double.parse(latestFeed['field1'] ?? '0');
           humidity.value = double.parse(latestFeed['field2'] ?? '0');
           voc.value = double.parse(latestFeed['field3'] ?? '0');
           pm.value = double.parse(latestFeed['field4'] ?? '0');
 
-          // Update sensor models with current values
+          // Update sensor models with current values.
           sensors[0] = sensors[0].copyWith(currentValue: temperature.value);
           sensors[1] = sensors[1].copyWith(currentValue: humidity.value);
           sensors[2] = sensors[2].copyWith(currentValue: voc.value);
@@ -119,6 +122,7 @@ class SensorController extends GetxController {
 
       if (response.statusCode == 200) {
         final data = json.decode(response.body);
+        print("response data is $data");
         final feeds = data['feeds'] as List;
 
         List<Map<String, dynamic>> history = [];
@@ -171,37 +175,21 @@ class SensorController extends GetxController {
     }
   }
 
+  /// New IAQ calculation using PM and VOC values only.
   Future<void> calculateIAQ() async {
     try {
       isLoading.value = true;
 
-      // Example IAQ calculation formula (replace with your actual formula)
-      // This is a simplified example
-      double tempScore = calculateTemperatureScore(temperature.value);
-      double humidityScore = calculateHumidityScore(humidity.value);
-      double vocScore = calculateVOCScore(voc.value);
-      double pmScore = calculatePMScore(pm.value);
+      // Calculate AQI for PM and VOC using breakpoint-based functions.
+      int aqiPM = calculatePM25AQI(pm.value);
+      int aqiVOC = calculateVOCAQI(voc.value);
 
-      // Calculate overall IAQ index (weighted average)
-      double calculatedIndex = (tempScore * 0.25 + humidityScore * 0.25 + vocScore * 0.25 + pmScore * 0.25);
-      iaqIndex.value = double.parse(calculatedIndex.toStringAsFixed(2));
+      // Choose the higher AQI as the final IAQ value.
+      int finalAQI = aqiPM > aqiVOC ? aqiPM : aqiVOC;
+      iaqIndex.value = finalAQI.toDouble();
+      iaqCategory.value = getAQICategory(finalAQI);
 
-      // Determine IAQ category
-      if (iaqIndex.value >= 0 && iaqIndex.value <= 50) {
-        iaqCategory.value = 'Good';
-      } else if (iaqIndex.value <= 100) {
-        iaqCategory.value = 'Moderate';
-      } else if (iaqIndex.value <= 150) {
-        iaqCategory.value = 'Unhealthy for Sensitive Groups';
-      } else if (iaqIndex.value <= 200) {
-        iaqCategory.value = 'Unhealthy';
-      } else if (iaqIndex.value <= 300) {
-        iaqCategory.value = 'Very Unhealthy';
-      } else {
-        iaqCategory.value = 'Hazardous';
-      }
-
-      // Save IAQ record to Firestore
+      // Save IAQ record to Firestore.
       await saveIAQRecord();
 
       Get.snackbar(
@@ -220,40 +208,65 @@ class SensorController extends GetxController {
     }
   }
 
-  // Example scoring functions (replace with your actual formulas)
-  double calculateTemperatureScore(double temp) {
-    // Optimal temperature is around 20-25°C
-    if (temp >= 20 && temp <= 25) return 25;
-    if (temp >= 18 && temp < 20) return 20;
-    if (temp > 25 && temp <= 28) return 20;
-    return 10; // Less optimal
+  /// --- New AQI Calculation Functions ---
+
+  /// Calculates the AQI based on PM2.5 concentration (μg/m³).
+  int calculatePM25AQI(double pmValue) {
+    if (pmValue <= 12.0) {
+      // Scale 0–50 for 0–12 µg/m³.
+      return ((50 / 12.0) * pmValue).round();
+    } else if (pmValue <= 35.4) {
+      // Scale 51–100 for 12.1–35.4 µg/m³.
+      return (((100 - 51) / (35.4 - 12.1)) * (pmValue - 12.1) + 51).round();
+    } else if (pmValue <= 55.4) {
+      // Scale 101–150 for 35.5–55.4 µg/m³.
+      return (((150 - 101) / (55.4 - 35.5)) * (pmValue - 35.5) + 101).round();
+    } else if (pmValue <= 150.4) {
+      // Scale 151–200 for 55.5–150.4 µg/m³.
+      return (((200 - 151) / (150.4 - 55.5)) * (pmValue - 55.5) + 151).round();
+    } else {
+      // For values beyond 150.4.
+      return 201;
+    }
   }
 
-  double calculateHumidityScore(double humidity) {
-    // Optimal humidity is around 40-60%
-    if (humidity >= 40 && humidity <= 60) return 25;
-    if (humidity >= 30 && humidity < 40) return 20;
-    if (humidity > 60 && humidity <= 70) return 20;
-    return 10; // Less optimal
+  /// Calculates the AQI based on VOC concentration (ppb).
+  int calculateVOCAQI(double vocValue) {
+    if (vocValue <= 220) {
+      // Scale 0–50 for 0–220 ppb.
+      return ((50 / 220) * vocValue).round();
+    } else if (vocValue <= 660) {
+      // Scale 51–100 for 221–660 ppb.
+      return (((100 - 51) / (660 - 221)) * (vocValue - 221) + 51).round();
+    } else if (vocValue <= 2200) {
+      // Scale 101–150 for 661–2200 ppb.
+      return (((150 - 101) / (2200 - 661)) * (vocValue - 661) + 101).round();
+    } else if (vocValue <= 5500) {
+      // Scale 151–200 for 2201–5500 ppb.
+      return (((200 - 151) / (5500 - 2201)) * (vocValue - 2201) + 151).round();
+    } else {
+      // For values beyond 5500.
+      return 201;
+    }
   }
 
-  double calculateVOCScore(double voc) {
-    // VOC levels (ppb)
-    if (voc < 200) return 25;
-    if (voc < 500) return 20;
-    if (voc < 1000) return 15;
-    if (voc < 2000) return 10;
-    return 5;
+  /// Returns an AQI category string based on the AQI value.
+  String getAQICategory(int aqi) {
+    if (aqi <= 50)
+      return "Good";
+    else if (aqi <= 100)
+      return "Moderate";
+    else if (aqi <= 150)
+      return "Unhealthy for Sensitive Groups";
+    else if (aqi <= 200)
+      return "Unhealthy";
+    else if (aqi <= 300)
+      return "Very Unhealthy";
+    else
+      return "Hazardous";
   }
 
-  double calculatePMScore(double pm) {
-    // PM levels (μg/m³)
-    if (pm < 12) return 25;
-    if (pm < 35) return 20;
-    if (pm < 55) return 15;
-    if (pm < 150) return 10;
-    return 5;
-  }
+  /// --- End of AQI Calculation Functions ---
 
   Future<void> saveIAQRecord() async {
     try {
@@ -315,4 +328,3 @@ extension SensorModelExtension on SensorModel {
     );
   }
 }
-
